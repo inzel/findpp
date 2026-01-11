@@ -451,11 +451,34 @@ loadTzSettings();
   function extractHighlightSpec(cmd) {
     const stages = splitPipes(cmd).map(tokenize);
 
-    // Try to derive pattern from the last grep stage
-    for (let si = stages.length - 1; si >= 0; si--) {
-      const st = stages[si];
-      if (!st?.length || st[0] !== "grep") continue;
+    function extractDelimitedRegex(input) {
+      if (!input) return null;
+      const s = String(input);
+      let start = -1;
+      let escaped = false;
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (escaped) { escaped = false; continue; }
+        if (ch === "\\") { escaped = true; continue; }
+        if (ch === "/") { start = i; break; }
+      }
+      if (start < 0) return null;
+      escaped = false;
+      for (let i = start + 1; i < s.length; i++) {
+        const ch = s[i];
+        if (escaped) { escaped = false; continue; }
+        if (ch === "\\") { escaped = true; continue; }
+        if (ch === "/") {
+          return {
+            body: s.slice(start + 1, i),
+            suffix: s.slice(i + 1)
+          };
+        }
+      }
+      return null;
+    }
 
+    function parseGrepStage(st) {
       let ignoreCase = false;
       let fixed = false;
       let pattern = "";
@@ -476,6 +499,49 @@ loadTzSettings();
       const src = fixed ? escapeRegexLiteral(pattern) : pattern;
       const flags = ignoreCase ? "gim" : "gm";
       return { src, flags, rawPattern: pattern, fixed, ignoreCase };
+    }
+
+    function parseAwkStage(st) {
+      const program = st.slice(1).find(t => t && !t.startsWith("-"));
+      const del = extractDelimitedRegex(program);
+      if (!del || !del.body) return null;
+      const src = del.body;
+      return { src, flags: "gm", rawPattern: del.body, fixed: false, ignoreCase: false };
+    }
+
+    function parseSedStage(st) {
+      const script = st.slice(1).find(t => t && !t.startsWith("-"));
+      if (!script) return null;
+
+      const sub = script.match(/^s(.)(.+?)\1(.*?)\1([gimI]*)$/);
+      if (sub) {
+        const flags = /i|I/.test(sub[4]) ? "gim" : "gm";
+        return { src: sub[2], flags, rawPattern: sub[2], fixed: false, ignoreCase: /i|I/.test(sub[4]) };
+      }
+
+      const del = extractDelimitedRegex(script);
+      if (!del || !del.body) return null;
+      const ignoreCase = /i|I/.test(del.suffix || "");
+      const flags = ignoreCase ? "gim" : "gm";
+      return { src: del.body, flags, rawPattern: del.body, fixed: false, ignoreCase };
+    }
+
+    const stageParsers = {
+      grep: parseGrepStage,
+      rg: parseGrepStage,
+      awk: parseAwkStage,
+      gawk: parseAwkStage,
+      sed: parseSedStage
+    };
+
+    // Try to derive pattern from the last matching stage (grep/awk/sed)
+    for (let si = stages.length - 1; si >= 0; si--) {
+      const st = stages[si];
+      if (!st?.length) continue;
+      const parser = stageParsers[st[0]];
+      if (!parser) continue;
+      const spec = parser(st);
+      if (spec?.src) return spec;
     }
 
     // If user typed a single token (no pipeline), treat it as a literal
