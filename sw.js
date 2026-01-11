@@ -455,6 +455,48 @@ function clearAll() {
     } catch {}
     return runWindowFind(text, caseSensitive, false);
   }
+
+  function runWindowFindCount(text, caseSensitive, maxCount) {
+    const limit = Number.isFinite(maxCount) ? maxCount : MAX_MARKS;
+    let count = 0;
+    let partial = false;
+    let anchorNode = null;
+    let anchorOffset = -1;
+
+    function captureAnchor() {
+      try {
+        const sel = window.getSelection && window.getSelection();
+        if (!sel || sel.rangeCount === 0) return null;
+        return { node: sel.anchorNode, offset: sel.anchorOffset };
+      } catch {
+        return null;
+      }
+    }
+
+    const first = captureAnchor();
+    if (first) {
+      anchorNode = first.node;
+      anchorOffset = first.offset;
+    }
+
+    while (true) {
+      if (count >= limit) { partial = true; break; }
+      count++;
+      const found = runWindowFind(text, caseSensitive, false);
+      if (!found) break;
+
+      const cur = captureAnchor();
+      if (cur && cur.node === anchorNode && cur.offset === anchorOffset) {
+        break;
+      }
+      if (!anchorNode && cur) {
+        anchorNode = cur.node;
+        anchorOffset = cur.offset;
+      }
+    }
+
+    return { count, partial };
+  }
   if (action === "clear") {
     clearAll();
     return { ok: true, count: 0, active: 0, kind: "none", frameUrl: String(location && location.href ? location.href : "") };
@@ -635,14 +677,21 @@ function clearAll() {
   // that doesn't map cleanly to text nodes). This provides Ctrl+F-like selection + Next/Prev navigation.
   const wfText = String(spec && (spec.raw || spec.src) ? (spec.raw || spec.src) : "").trim();
   const wfCaseSensitive = !String(flags || "").includes("i");
-  if (!marks.length && wfText && wfText.length <= 200) {
+  if (wfText && wfText.length <= 200) {
     const found = runWindowFindInit(wfText, wfCaseSensitive);
     if (found) {
-      state.kind = "windowfind";
-      state.wfText = wfText;
-      state.wfCaseSensitive = wfCaseSensitive;
-      state.wfFound = true;
-      return { ok: true, count: 1, active: 1, kind: "windowfind", partial: true, frameUrl: String(location && location.href ? location.href : "") };
+      const counted = runWindowFindCount(wfText, wfCaseSensitive, MAX_MARKS);
+      if (!marks.length || counted.count > marks.length) {
+        if (marks.length) {
+          try { clearDomHighlights(); } catch {}
+          marks = [];
+        }
+        state.kind = "windowfind";
+        state.wfText = wfText;
+        state.wfCaseSensitive = wfCaseSensitive;
+        state.wfFound = true;
+        return { ok: true, count: Math.max(1, counted.count), active: 1, kind: "windowfind", partial: counted.partial, frameUrl: String(location && location.href ? location.href : "") };
+      }
     }
   }
 
