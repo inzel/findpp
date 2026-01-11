@@ -588,7 +588,6 @@ function clearAll() {
         frag.appendChild(span);
         marks.push(span);
         insertedCount++;
-        insertedCount++;
 
         last = end;
 
