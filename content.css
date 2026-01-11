@@ -1,0 +1,12 @@
+#gf-host {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483647;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+/* Find++ panel additions */
+#gf-host .gf_hl { color: #ff4d4d; font-weight: 700; }
+#gf-host input, #gf-host button, #gf-host textarea { outline: none; }
+#gf-host input:focus, #gf-host textarea:focus { border-color: #555; }
+

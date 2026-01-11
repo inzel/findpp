@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Find++",
+  "version": "0.6.0",
+  "description": "Hybrid pipeline grep + on-page highlight search (Monaco/table/DOM extraction; on-page highlight prefers rendered DOM matches via Range rect checks, uses visible textarea selection only when it matches, and falls back to window.find; Hybrid highlights even when pipeline matches).",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "action": {
+    "default_title": "Find++"
+  },
+  "commands": {
+    "toggle-findpp": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Toggle Find++ panel"
+    }
+  }
+}
