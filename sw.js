@@ -119,15 +119,44 @@ function __gf_hl_page(action, spec, opts) {
 
   
   // ---------- Monaco engine (iHealth classic BIG-IP viewer) ----------
-  function getMonacoEditor() {
+  function getMonacoGlobal() {
     try {
-      const mon = window.monaco;
+      if (window.monaco && window.monaco.editor) return window.monaco;
+    } catch {}
+    try {
+      const parent = window.parent;
+      if (parent && parent !== window && parent.monaco && parent.monaco.editor) return parent.monaco;
+    } catch {}
+    try {
+      const top = window.top;
+      if (top && top !== window && top.monaco && top.monaco.editor) return top.monaco;
+    } catch {}
+    return null;
+  }
+
+  function getMonacoEditor(mon) {
+    try {
       if (!mon || !mon.editor) return null;
 
       // Some builds expose editor lists
       try {
         if (typeof mon.editor.getEditors === "function") {
           const eds = mon.editor.getEditors();
+          if (eds && eds.length) return eds[0];
+        }
+      } catch {}
+
+      try {
+        if (typeof mon.editor.getCodeEditors === "function") {
+          const eds = mon.editor.getCodeEditors();
+          if (eds && eds.length) return eds[0];
+        }
+      } catch {}
+
+      try {
+        const internal = mon.editor._codeEditors || mon.editor._editors;
+        if (internal) {
+          const eds = Array.from(typeof internal.values === "function" ? internal.values() : internal);
           if (eds && eds.length) return eds[0];
         }
       } catch {}
@@ -207,11 +236,11 @@ function __gf_hl_page(action, spec, opts) {
 
   function runMonacoEngine(src, flags) {
     try {
-      const mon = window.monaco;
+      const mon = getMonacoGlobal();
       const models = mon?.editor?.getModels?.() || [];
       if (!models.length) return null;
 
-      const ed = getMonacoEditor();
+      const ed = getMonacoEditor(mon);
       if (!ed || typeof ed.getModel !== "function") return null;
 
       const model = ed.getModel() || models[0];
