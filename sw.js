@@ -671,7 +671,34 @@ async function __gf_hl_exec(tabId, action, spec, preferFrameId) {
     }
   }
 
-  // 2) Try all frames (best effort). Note: some sites/frames can reject injection.
+  // 2) Try per-frame injection to avoid allFrames failing on inaccessible frames.
+  try {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    if (Array.isArray(frames) && frames.length) {
+      const results = await Promise.all(
+        frames.map(async (frame) => {
+          if (!Number.isFinite(frame.frameId)) return null;
+          try {
+            const r = await chrome.scripting.executeScript({
+              target: { tabId, frameIds: [frame.frameId] },
+              world: "MAIN",
+              func: __gf_hl_page,
+              args: [action, spec || null, opts],
+            });
+            return r?.[0] || null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      const cleaned = results.filter(Boolean);
+      if (cleaned.length) return cleaned;
+    }
+  } catch {
+    // fall through
+  }
+
+  // 3) Try all frames (best effort). Note: some sites/frames can reject injection.
   try {
     return await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
@@ -679,7 +706,7 @@ async function __gf_hl_exec(tabId, action, spec, preferFrameId) {
       args: [action, spec || null, opts],
     });
   } catch (e) {
-    // 3) If allFrames fails due to an inaccessible frame, fall back to top frame.
+    // 4) If allFrames fails due to an inaccessible frame, fall back to top frame.
     return await chrome.scripting.executeScript({
       target: { tabId },
       world: "MAIN",
