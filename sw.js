@@ -659,6 +659,18 @@ function clearAll() {
         } else {
           frag.appendChild(document.createTextNode(hit));
         }
+        const span = document.createElement("span");
+        span.className = MARK_CLASS;
+        span.textContent = hit;
+        try {
+          span.style.background = "rgba(255,215,0,0.35)";
+          span.style.outline = "1px solid rgba(255,215,0,0.65)";
+          span.style.borderRadius = "2px";
+          span.style.padding = "0 1px";
+        } catch {}
+        frag.appendChild(span);
+        marks.push(span);
+        insertedCount++;
 
         last = end;
 
