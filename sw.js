@@ -629,17 +629,12 @@ function clearAll() {
       let m = re.exec(raw);
       if (!m) continue;
 
-      // Skip matches that are not actually rendered (e.g., hidden duplicate text in display:none containers).
-      // We test the first match using a Range; if it has no client rects, it's not in layout.
-      const firstHit = m[0] || "";
-      if (!firstHit) continue;
-      if (!rangeHasRects(node, m.index, m.index + firstHit.length)) continue;
-
       // Build fragment with all matches
       const frag = document.createDocumentFragment();
       let last = 0;
       re.lastIndex = 0;
       let guard = 0;
+      let hasVisible = false;
       while ((m = re.exec(raw)) !== null) {
         const hit = m[0] || "";
         if (!hit) break;
@@ -647,6 +642,23 @@ function clearAll() {
         const end = start + hit.length;
 
         frag.appendChild(document.createTextNode(raw.slice(last, start)));
+        if (rangeHasRects(node, start, end)) {
+          const span = document.createElement("span");
+          span.className = MARK_CLASS;
+          span.textContent = hit;
+          try {
+            span.style.background = "rgba(255,215,0,0.35)";
+            span.style.outline = "1px solid rgba(255,215,0,0.65)";
+            span.style.borderRadius = "2px";
+            span.style.padding = "0 1px";
+          } catch {}
+          frag.appendChild(span);
+          marks.push(span);
+          insertedCount++;
+          hasVisible = true;
+        } else {
+          frag.appendChild(document.createTextNode(hit));
+        }
         const span = document.createElement("span");
         span.className = MARK_CLASS;
         span.textContent = hit;
@@ -667,9 +679,11 @@ function clearAll() {
       }
       frag.appendChild(document.createTextNode(raw.slice(last)));
 
-      try {
-        node.parentNode.replaceChild(frag, node);
-      } catch {}
+      if (hasVisible) {
+        try {
+          node.parentNode.replaceChild(frag, node);
+        } catch {}
+      }
 
       if (partial) break;
     }
